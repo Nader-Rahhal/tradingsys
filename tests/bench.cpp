@@ -20,16 +20,16 @@ void run_perf_bench(const char* name, int n, int n_price_levels) {
     const WorkloadFixture w = make_workload(n, 42, n_price_levels, 4, 4);
 
     typename Tag::Book book;
-    for (size_t i = 0; i < w.seed_ids.size(); ++i)
-        book.addOrder(w.seed_ids[i], w.seed_prices[i], w.seed_volumes[i]);
+    for (size_t i = 0; i < w.seed_prices.size(); ++i)
+        book.addOrder(w.seed_prices[i], w.seed_volumes[i]);
 
     auto t0 = std::chrono::steady_clock::now();
 
     for (const auto& e : w.events) {
         switch (e.op) {
-            case Op::Add:    book.addOrder(e.id, e.price, e.volume);    break;
-            case Op::Delete: book.deleteOrder(e.id);                    break;
-            case Op::Modify: book.modifyOrder(e.id, e.price, e.volume); break;
+            case Op::Add:    book.addOrder(e.price, e.volume);                        break;
+            case Op::Delete: book.deleteOrder(e.price, e.volume);                     break;
+            case Op::Modify: book.modifyOrder(e.old_price, e.old_volume, e.price, e.volume); break;
         }
     }
 

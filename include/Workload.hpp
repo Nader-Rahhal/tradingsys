@@ -2,38 +2,23 @@
 #include <random>
 #include <vector>
 
-// ── Event types ───────────────────────────────────────────────────────────────
-
 enum class Op { Add, Delete, Modify };
 
 struct Event {
-    Op       op;
-    uint64_t id;
-    int64_t  price;
-    int64_t  volume;
+    Op      op;
+    int64_t price;
+    int64_t volume;
+    // for Modify only: the old price/volume to remove
+    int64_t old_price;
+    int64_t old_volume;
 };
-
-// ── Fixture ───────────────────────────────────────────────────────────────────
 
 struct WorkloadFixture {
-    std::vector<Event>    events;
-    // orders pre-loaded into the book before the timed region
-    std::vector<uint64_t> seed_ids;
-    std::vector<int64_t>  seed_prices;
-    std::vector<int64_t>  seed_volumes;
+    std::vector<Event>   events;
+    std::vector<int64_t> seed_prices;
+    std::vector<int64_t> seed_volumes;
 };
 
-// ── Factory ───────────────────────────────────────────────────────────────────
-//
-// add_pct + delete_pct out of 10 — remainder is modify.
-// Prices sampled with geometric decay from touch (level 0):
-//   P(level k) = p * (1-p)^k,  p = 0.3
-//   ~30% of activity at touch, ~70% within 3 ticks — matches liquid equity feeds.
-//
-// n_price_levels: number of distinct price levels above base (10000).
-//   20  = liquid name, tight $0.20 spread
-//   200 = wider/illiquid book
-//
 inline WorkloadFixture make_workload(int n, uint32_t seed, int n_price_levels,
                                      int add_pct, int delete_pct) {
     std::mt19937 rng(seed);
@@ -44,38 +29,41 @@ inline WorkloadFixture make_workload(int n, uint32_t seed, int n_price_levels,
         return 10000 + level * 100;
     };
 
-    WorkloadFixture w;
-    uint64_t next_id = 1;
-    std::vector<uint64_t> live_ids;
+    struct LiveOrder { int64_t price, volume; };
+    std::vector<LiveOrder> live_orders;
 
-    // seed book with n/2 live orders
-    for (int i = 0; i < n / 2; ++i, ++next_id) {
+    WorkloadFixture w;
+
+    // seed
+    for (int i = 0; i < n / 2; ++i) {
         int64_t price  = sample_price();
         int64_t volume = 1 + rng() % 100;
-        w.seed_ids.push_back(next_id);
         w.seed_prices.push_back(price);
         w.seed_volumes.push_back(volume);
-        live_ids.push_back(next_id);
+        live_orders.push_back({price, volume});
     }
 
     w.events.reserve(n);
     for (int i = 0; i < n; ++i) {
         int roll = rng() % 10;
-        if (roll < add_pct || live_ids.empty()) {
+        if (roll < add_pct || live_orders.empty()) {
             int64_t price  = sample_price();
             int64_t volume = 1 + rng() % 100;
-            w.events.push_back({ Op::Add, next_id, price, volume });
-            live_ids.push_back(next_id++);
+            w.events.push_back({ Op::Add, price, volume, 0, 0 });
+            live_orders.push_back({price, volume});
         } else if (roll < add_pct + delete_pct) {
-            size_t idx = rng() % live_ids.size();
-            w.events.push_back({ Op::Delete, live_ids[idx], 0, 0 });
-            live_ids[idx] = live_ids.back();  // swap-and-pop O(1)
-            live_ids.pop_back();
+            size_t idx = rng() % live_orders.size();
+            auto [price, volume] = live_orders[idx];
+            w.events.push_back({ Op::Delete, price, volume, 0, 0 });
+            live_orders[idx] = live_orders.back();
+            live_orders.pop_back();
         } else {
-            size_t  idx    = rng() % live_ids.size();
-            int64_t price  = sample_price();
-            int64_t volume = 1 + rng() % 100;
-            w.events.push_back({ Op::Modify, live_ids[idx], price, volume });
+            size_t  idx        = rng() % live_orders.size();
+            int64_t new_price  = sample_price();
+            int64_t new_volume = 1 + rng() % 100;
+            auto [old_price, old_volume] = live_orders[idx];
+            w.events.push_back({ Op::Modify, new_price, new_volume, old_price, old_volume });
+            live_orders[idx] = {new_price, new_volume};
         }
     }
     return w;
