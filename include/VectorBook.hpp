@@ -9,6 +9,7 @@ class VectorBook {
     std::vector<std::pair<int64_t, int64_t>> levels_;
     Compare cmp_;
 
+    // return iterator to level with given price
     auto find_level(int64_t price) {
         return std::find_if(levels_.begin(), levels_.end(),
             [price](const auto& p) { return p.first == price; });

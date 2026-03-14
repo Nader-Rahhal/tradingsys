@@ -12,6 +12,12 @@
 struct BidTag { using Book = MapBook<std::greater<int64_t>>; };
 struct AskTag { using Book = MapBook<std::less<int64_t>>;    };
 
+auto Handler dispatch[3] = {
+    [](Book& b, const Event& e) { b.addOrder(e.price, e.volume); },
+    [](Book& b, const Event& e) { b.addOrder(e.price, e.volume); },
+    [](Book& b, const Event& e) { b.modifyOrder(e.old_price, e.old_volume, e.price, e.volume); },
+};
+
 template <typename T>
 concept OrderbookTag = Orderbook<typename T::Book>;
 
@@ -26,11 +32,7 @@ void run_perf_bench(const char* name, int n, int n_price_levels) {
     auto t0 = std::chrono::steady_clock::now();
     raise(SIGSTOP);
     for (const auto& e : w.events) {
-        switch (e.op) {
-            case Op::Add:    book.addOrder(e.price, e.volume);                        break;
-            case Op::Delete: book.deleteOrder(e.price, e.volume);                     break;
-            case Op::Modify: book.modifyOrder(e.old_price, e.old_volume, e.price, e.volume); break;
-        }
+        dispatch[static_cast<int>(e.op)](book, e);
     }
 
     auto t1 = std::chrono::steady_clock::now();
