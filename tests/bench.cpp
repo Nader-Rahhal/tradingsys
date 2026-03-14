@@ -24,7 +24,7 @@ void run_perf_bench(const char* name, int n, int n_price_levels) {
         book.addOrder(w.seed_prices[i], w.seed_volumes[i]);
 
     auto t0 = std::chrono::steady_clock::now();
-
+    raise(SIGSTOP);
     for (const auto& e : w.events) {
         switch (e.op) {
             case Op::Add:    book.addOrder(e.price, e.volume);                        break;
@@ -41,6 +41,6 @@ void run_perf_bench(const char* name, int n, int n_price_levels) {
 
 int main() {
     run_perf_bench<BidTag>("MapBook BidTag", 10'000'000, 20);
-    run_perf_bench<AskTag>("MapBook AskTag", 10'000'000, 20);
+    // run_perf_bench<AskTag>("MapBook AskTag", 10'000'000, 20);
     return 0;
 }
