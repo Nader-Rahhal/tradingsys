@@ -7,9 +7,9 @@
 #include "Workload.hpp"
 #include "MapBook.hpp"
 #include "Orderbook.hpp"
+#include "Vectorbook.hpp"
 
-
-struct BidTag { using Book = MapBook<std::greater<int64_t>>; };
+struct BidTag { using Book = VectorBook<std::greater<int64_t>>; };
 struct AskTag { using Book = MapBook<std::less<int64_t>>;    };
 
 auto Handler dispatch[3] = {
